@@ -1,0 +1,5 @@
+{
+  "name": "Viral Post Analyzer",
+  "description": "An application that uses AI to analyze trends, characteristics, and personas of viral posts based on a selected industry, helping creators and marketers understand what makes content successful.",
+  "requestFramePermissions": []
+}
