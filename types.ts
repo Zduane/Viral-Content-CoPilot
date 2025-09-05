@@ -1,4 +1,12 @@
+import { User } from 'firebase/auth';
+export type { User };
 
+
+export interface UserProfile {
+  fullName: string;
+  email: string;
+  createdAt: Date;
+}
 
 export interface Persona {
   name: string;

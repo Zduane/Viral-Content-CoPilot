@@ -4,6 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { ScriptResult, Scene } from '../types';
 import { checkVideoStatus, startVideoGeneration } from '../services/geminiService';
 import { VideoCameraIcon } from '../constants';
+import { getEnv } from '../services/apiConfig';
 
 interface RenderQueueProps {
   script: ScriptResult;
@@ -12,14 +13,6 @@ interface RenderQueueProps {
   productImages: { data: string; mimeType: string }[];
   productDescription: string;
 }
-
-// Safely gets environment variables in a client-side context.
-const getEnv = (key: string): string | null => {
-    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-        return (import.meta as any).env[key] || null;
-    }
-    return null;
-};
 
 const LOADING_MESSAGES = [
     "Conceptualizing your scene...",
@@ -61,7 +54,6 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
 
         for (const item of itemsToProcess) {
             const sceneIndex = item.originalIndex;
-            // FIX: Replaced NodeJS.Timeout with ReturnType<typeof setInterval> for browser compatibility.
             let pollingInterval: ReturnType<typeof setInterval> | null = null;
             
             try {
@@ -138,9 +130,9 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
 
                                 const downloadLink = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
                                 if (downloadLink) {
-                                    const apiKey = getEnv('VITE_API_KEY');
+                                    const apiKey = getEnv('VITE_API_KEY') || getEnv('API_KEY');
                                     if (!apiKey) {
-                                        throw new Error("Google AI API Key not found. Cannot download generated video.");
+                                        throw new Error("Google AI API Key not found. Please make sure VITE_API_KEY or API_KEY is set to download the video.");
                                     }
                                     const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
                                     if (!videoResponse.ok) {

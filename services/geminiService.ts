@@ -1,22 +1,15 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, ScriptResult, ProductAnalysis, VoiceDesignParameters } from '../types';
-
-// Safely gets environment variables in a client-side context.
-const getEnv = (key: string): string | null => {
-    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-        return (import.meta as any).env[key] || null;
-    }
-    return null;
-};
+import { getEnv } from './apiConfig';
 
 /**
  * Lazily creates and returns a GoogleGenAI client instance.
  * Throws an error if the Google AI API key has not been configured.
  */
 function getGoogleAIClient(): GoogleGenAI {
-    const apiKey = getEnv('VITE_API_KEY');
+    const apiKey = getEnv('VITE_API_KEY') || getEnv('API_KEY');
     if (!apiKey) {
-        throw new Error("Google AI API Key not found. Please make sure the VITE_API_KEY environment variable is set.");
+        throw new Error("Google AI API Key not found. Please make sure VITE_API_KEY or API_KEY environment variable is set.");
     }
     return new GoogleGenAI({ apiKey });
 }

@@ -258,20 +258,59 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
         const status = scene.videoStatus || 'idle';
         const isImageGenerated = !!scene.imageUrl;
 
+        const statusConfig = {
+            idle: {
+                label: 'Ready',
+                containerClasses: 'bg-gray-800/50 border-gray-700/60',
+                labelClasses: 'text-gray-300 bg-gray-700',
+            },
+            queued: {
+                label: 'Queued',
+                containerClasses: 'bg-yellow-900/30 border-yellow-700/50',
+                labelClasses: 'text-yellow-200 bg-yellow-800/70',
+            },
+            processing: {
+                label: 'Processing',
+                containerClasses: 'bg-blue-900/30 border-blue-700/50',
+                labelClasses: 'text-blue-200 bg-blue-800/70',
+            },
+            done: {
+                label: 'Complete',
+                containerClasses: 'bg-green-900/30 border-green-700/50',
+                labelClasses: 'text-green-200 bg-green-800/70',
+            },
+            error: {
+                label: 'Error',
+                containerClasses: 'bg-red-900/30 border-red-700/50',
+                labelClasses: 'text-red-200 bg-red-800/70',
+            },
+        };
+        
+        const config = statusConfig[status];
+
         const AddToQueueButton = () => (
-             <button
-                onClick={() => onAddToQueue(sceneIndex)}
-                className="w-full flex items-center justify-center px-4 py-2 bg-indigo-600 rounded-lg font-semibold text-sm text-white hover:bg-indigo-500 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed transform hover:scale-105"
-                disabled={!isImageGenerated || scene.isGeneratingImage}
-            >
-                <VideoCameraIcon className="w-5 h-5 mr-2" />
-                Add to Render Queue
-            </button>
+            <div className="relative group w-full">
+                <button
+                    onClick={() => onAddToQueue(sceneIndex)}
+                    className="w-full flex items-center justify-center px-4 py-2 bg-indigo-600 rounded-lg font-semibold text-sm text-white hover:bg-indigo-500 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed transform hover:scale-105"
+                    disabled={!isImageGenerated || scene.isGeneratingImage}
+                >
+                    <VideoCameraIcon className="w-5 h-5 mr-2" />
+                    Add to Render Queue
+                </button>
+                 {!isImageGenerated && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Generate the scene image first
+                    </div>
+                )}
+            </div>
         );
 
-        switch(status) {
+        let content;
+        switch (status) {
             case 'done':
-                return scene.videoUrl ? <video 
+                content = scene.videoUrl ? <video 
+                    key={scene.videoUrl}
                     src={scene.videoUrl} 
                     controls 
                     className="w-full h-auto rounded-lg object-cover aspect-video"
@@ -279,53 +318,50 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
                     onPause={handleVideoPause}
                     onEnded={handleVideoPause}
                     onSeeked={(e) => handleVideoSeeked(e.currentTarget)}
-                 /> : null;
-            
+                 /> : <p className="text-sm text-gray-400">Video is ready but URL is missing.</p>;
+                break;
             case 'processing':
-                 return (
-                    <div className="flex flex-col items-center justify-center text-center bg-gray-800 rounded-lg p-4 h-28">
+                content = (
+                    <div className="flex flex-col items-center justify-center text-center p-4 min-h-[8rem]">
                         <svg className="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <p className="mt-2 text-sm font-semibold text-gray-300">Creating Your Video...</p>
-                        <p className="text-xs text-gray-400 mt-1">{scene.videoGenerationMessage}</p>
+                        <p className="mt-2 text-sm font-semibold text-gray-300">{scene.videoGenerationMessage || 'Creating Your Video...'}</p>
                     </div>
                 );
-            
+                break;
             case 'queued':
-                return (
-                    <div className="flex items-center justify-center bg-gray-800 rounded-lg p-2 h-10">
-                        <span className="text-sm font-semibold text-gray-400">Queued for Rendering...</span>
-                    </div>
-                );
-
+                content = <p className="text-center text-sm text-yellow-300 p-4">In the render queue...</p>;
+                break;
             case 'error':
-                 return (
-                    <div className="flex flex-col items-center justify-center text-center bg-red-900/50 rounded-lg p-2 h-16 border border-red-500">
-                         <p className="text-sm font-bold text-red-300">Generation Failed</p>
-                         <button
+                content = (
+                    <div className="flex flex-col items-center justify-center text-center p-4">
+                        <p className="text-sm font-bold text-red-300">Generation Failed</p>
+                        <p className="text-xs text-red-400 mt-1 max-w-full truncate" title={scene.videoGenerationMessage}>{scene.videoGenerationMessage}</p>
+                        <button
                             onClick={() => onAddToQueue(sceneIndex)}
-                            className="mt-1 text-xs text-red-200 underline hover:text-white"
-                         >
-                           Retry
-                         </button>
+                            className="mt-3 text-sm font-semibold bg-red-600 hover:bg-red-500 text-white py-1 px-3 rounded-md"
+                        >
+                           Retry Render
+                        </button>
                     </div>
                 );
-
+                break;
             case 'idle':
             default:
-                return (
-                    <div className="relative group">
-                       <AddToQueueButton />
-                       {!isImageGenerated && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                Generate the scene image first
-                            </div>
-                        )}
-                    </div>
-                );
+                content = <AddToQueueButton />;
         }
+        
+        return (
+            <div className={`p-3 rounded-lg border ${config.containerClasses} transition-colors`}>
+                <div className="flex justify-between items-center mb-3">
+                    <h5 className="font-semibold text-gray-200 text-sm">Video Status</h5>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${config.labelClasses}`}>{config.label}</span>
+                </div>
+                {content}
+            </div>
+        );
     }
 
     return (
@@ -370,27 +406,28 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
                     <h4 className="font-semibold text-purple-300 text-sm uppercase tracking-wider">Scenes</h4>
                     <div className="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {script.scenes.map((scene, index) => (
-                             <div key={index} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/60 flex flex-col">
-                                <p className="font-semibold text-gray-300 mb-2">Scene {index + 1}</p>
-                                <div className="flex items-center justify-between">
-                                    <p className="text-sm text-gray-400 flex-1">
-                                      <span className="font-medium text-gray-300">🎤 {scene.scriptType === 'dialogue' ? 'Dialogue' : 'Voiceover'}:</span> {scene.script}
-                                    </p>
-                                    <button onClick={() => handlePlayOrGenerateVoiceover(index)} className="ml-2 text-gray-400 hover:text-white transition-colors" title="Play Voiceover" disabled={scene.isGeneratingVoiceover}>
-                                        {scene.isGeneratingVoiceover ? (
-                                            <svg className="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                        ) : (
-                                            <PlayCircleIcon className="w-6 h-6"/>
-                                        )}
-                                    </button>
+                             <div key={index} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/60 flex flex-col space-y-4">
+                                <div>
+                                    <p className="font-semibold text-gray-300 mb-2">Scene {index + 1}</p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm text-gray-400 flex-1">
+                                          <span className="font-medium text-gray-300">🎤 {scene.scriptType === 'dialogue' ? 'Dialogue' : 'Voiceover'}:</span> {scene.script}
+                                        </p>
+                                        <button onClick={() => handlePlayOrGenerateVoiceover(index)} className="ml-2 text-gray-400 hover:text-white transition-colors flex-shrink-0" title="Play Voiceover" disabled={scene.isGeneratingVoiceover}>
+                                            {scene.isGeneratingVoiceover ? (
+                                                <svg className="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            ) : (
+                                                <PlayCircleIcon className="w-6 h-6"/>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <p className="text-sm text-gray-400 mt-2"><span className="font-medium text-gray-300">👁️ Visual:</span> {scene.visual}</p>
                                 </div>
-
-                                <p className="text-sm text-gray-400 mt-3"><span className="font-medium text-gray-300">👁️ Visual:</span> {scene.visual}</p>
                                 
-                                <div className="mt-4 flex-grow">
+                                <div className="flex-grow">
                                     <label htmlFor={`interaction-prompt-${index}`} className="block text-xs font-medium text-gray-400 mb-1">
                                         Interaction Prompt (Optional)
                                     </label>
@@ -406,7 +443,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
                                     <p className="text-xs text-gray-500 mt-1">Guide the AI on exactly how the product is used.</p>
                                 </div>
                                 
-                                <div className="mt-4 space-y-2">
+                                <div className="space-y-3">
                                     {/* Image Generation */}
                                     {scene.isGeneratingImage ? (
                                         <div className="flex items-center justify-center bg-gray-800 rounded-lg p-2 h-10">

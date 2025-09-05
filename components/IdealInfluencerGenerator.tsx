@@ -488,7 +488,6 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                                         </AnalysisItem>
                                         <AnalysisItem title="Value Proposition">
                                             {result.product.productAnalysis.valueProposition}
-                                        {/* FIX: Corrected typo in closing tag from AanlysisItem to AnalysisItem */}
                                         </AnalysisItem>
                                         <AnalysisItem title="Market Saturation">
                                             {result.product.productAnalysis.marketSaturation}
