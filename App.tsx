@@ -11,9 +11,15 @@ import IdealInfluencerGenerator from './components/IdealInfluencerGenerator';
 import ScriptGenerator from './components/ScriptGenerator';
 import ScriptDisplay from './components/ScriptDisplay';
 import RenderQueue from './components/RenderQueue';
+import ApiKeyError from './components/ApiKeyError';
 
 
 const App: React.FC = () => {
+  // Add a check for the API key at the top level of the app.
+  if (!process.env.API_KEY) {
+    return <ApiKeyError />;
+  }
+
   // State for Trend Analyzer (Step 1)
   const [selectedIndustry, setSelectedIndustry] = useState<string>(INDUSTRIES[0]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);

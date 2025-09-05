@@ -1,13 +1,10 @@
 
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, ScriptResult, ProductAnalysis, VoiceDesignParameters } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Conditionally initialize the AI client only if the API key exists.
+// The main App component will handle the case where the key is missing.
+const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
 
 const scriptSchema = {
     type: Type.OBJECT,
@@ -131,6 +128,7 @@ export interface InfluencerGenerationResult {
 
 
 export const fetchViralAnalysis = async (industry: string): Promise<AnalysisResult> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const prompt = `
             You are an expert social media and market trend analyst specializing in identifying viral products and topics using real-time web data.
@@ -217,6 +215,7 @@ export const fetchViralAnalysis = async (industry: string): Promise<AnalysisResu
 
 
 export const generateImage = async (prompt: string): Promise<string> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
@@ -275,6 +274,7 @@ export const generateViralScript = async (
     influencerDescription: string,
     analysisResult: AnalysisResult | null
 ): Promise<ScriptResult> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const analysisContext = analysisResult
             ? `
@@ -343,6 +343,7 @@ export const generateViralScript = async (
 export const generateIdealInfluencer = async (
     input: { url?: string; images?: { data: string; mimeType: string }[] | null }
 ): Promise<InfluencerGenerationResult> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const model = "gemini-2.5-flash";
         let response;
@@ -435,6 +436,7 @@ export const generateSceneImage = async (
     sceneVisual: string,
     interactionPrompt: string
 ): Promise<string> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const interactionInstruction = (interactionPrompt && interactionPrompt.trim() !== '')
             ? `
@@ -512,6 +514,7 @@ export const startVideoGeneration = async (
     prompt: string,
     image: { data: string; mimeType: string }
 ): Promise<any> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const operation = await ai.models.generateVideos({
             model: 'veo-2.0-generate-001',
@@ -535,6 +538,7 @@ export const startVideoGeneration = async (
 };
 
 export const checkVideoStatus = async (operation: any): Promise<any> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const updatedOperation = await ai.operations.getVideosOperation({ operation: operation });
         return updatedOperation;
@@ -548,6 +552,7 @@ export const checkVideoStatus = async (operation: any): Promise<any> => {
 };
 
 export const getVoiceDesignParameters = async (influencerDescription: string): Promise<VoiceDesignParameters> => {
+    if (!ai) throw new Error("Google AI API Key not configured. Please set the API_KEY environment variable.");
     try {
         const prompt = `
             You are an expert voice director. Based on the following influencer description, your task is to define the parameters for an AI voice generation model.
