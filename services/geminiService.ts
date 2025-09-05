@@ -21,6 +21,36 @@ function getGoogleAIClient(): GoogleGenAI {
     return new GoogleGenAI({ apiKey });
 }
 
+/**
+ * A retry wrapper for Google AI API calls to handle transient errors like 503s.
+ * @param apiCall The async function to call.
+ * @param maxRetries The maximum number of retries.
+ * @returns The result of the API call.
+ */
+async function withRetries<T>(apiCall: () => Promise<T>, maxRetries = 3): Promise<T> {
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await apiCall(); // Attempt the call
+        } catch (error) {
+            lastError = error as Error;
+            console.warn(`API call attempt ${attempt} failed.`, error);
+
+            // Check for retriable errors (overloaded, unavailable)
+            if (attempt < maxRetries && error instanceof Error && (error.message.includes('503') || error.message.includes('UNAVAILABLE') || error.message.includes('overloaded'))) {
+                const delay = 1500 * Math.pow(2, attempt - 1); // Exponential backoff: 1.5s, 3s, 6s
+                console.log(`Service is busy. Retrying in ${delay / 1000} seconds...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                throw lastError; // Non-retriable error or max retries reached
+            }
+        }
+    }
+    // This part should not be reachable if logic is correct, but as a fallback for type safety.
+    throw lastError || new Error("API call failed after multiple retries.");
+}
+
+
 const scriptSchema = {
     type: Type.OBJECT,
     properties: {
@@ -150,8 +180,8 @@ export interface InfluencerGenerationResult {
 
 
 export const fetchViralAnalysis = async (industry: string): Promise<AnalysisResult> => {
-    const ai = getGoogleAIClient();
     try {
+        const ai = getGoogleAIClient();
         const prompt = `
             You are an expert social media and market trend analyst specializing in identifying viral products and topics using real-time web data.
             For the industry "${industry}", provide a detailed analysis focusing on the most current, up-to-date data from this year.
@@ -187,13 +217,13 @@ export const fetchViralAnalysis = async (industry: string): Promise<AnalysisResu
             CRITICAL: You MUST structure your entire response as a single, raw JSON object. Do not include any introductory text, explanations, or markdown formatting (like \`\`\`json). The output must be parsable JSON.
         `;
 
-        const response = await ai.models.generateContent({
+        const response = await withRetries(() => ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                  tools: [{googleSearch: {}}],
             },
-        });
+        }));
         
         const responseText = response.text.trim();
         // Clean the response to remove markdown fences if they exist.
@@ -237,9 +267,9 @@ export const fetchViralAnalysis = async (industry: string): Promise<AnalysisResu
 
 
 export const generateImage = async (prompt: string): Promise<string> => {
-    const ai = getGoogleAIClient();
     try {
-        const response = await ai.models.generateImages({
+        const ai = getGoogleAIClient();
+        const response = await withRetries(() => ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
             prompt: prompt,
             config: {
@@ -247,7 +277,7 @@ export const generateImage = async (prompt: string): Promise<string> => {
                 outputMimeType: 'image/png',
                 aspectRatio: '1:1',
             },
-        });
+        }));
 
         if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image?.imageBytes) {
             const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
@@ -296,8 +326,8 @@ export const generateViralScript = async (
     influencerDescription: string,
     analysisResult: AnalysisResult | null
 ): Promise<ScriptResult> => {
-    const ai = getGoogleAIClient();
     try {
+        const ai = getGoogleAIClient();
         const analysisContext = analysisResult
             ? `
             Here is some context about the current market trends, which you should use to make the script more relevant and likely to go viral:
@@ -340,14 +370,14 @@ export const generateViralScript = async (
         const influencerImagePart = { inlineData: { data: influencerImage.data, mimeType: influencerImage.mimeType } };
         const textPart = { text: prompt };
 
-        const response = await ai.models.generateContent({
+        const response = await withRetries(() => ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: { parts: [...productImageParts, influencerImagePart, textPart] },
             config: {
                 responseMimeType: "application/json",
                 responseSchema: scriptSchema,
             }
-        });
+        }));
 
         const responseText = response.text.trim();
         const cleanedText = responseText.replace(/^```json\s*/, '').replace(/```$/, '');
@@ -365,8 +395,8 @@ export const generateViralScript = async (
 export const generateIdealInfluencer = async (
     input: { url?: string; images?: { data: string; mimeType: string }[] | null }
 ): Promise<InfluencerGenerationResult> => {
-    const ai = getGoogleAIClient();
     try {
+        const ai = getGoogleAIClient();
         const model = "gemini-2.5-flash";
         let response;
         let config: any = {};
@@ -417,11 +447,11 @@ export const generateIdealInfluencer = async (
             throw new Error("Either a URL or product images must be provided.");
         }
         
-        response = await ai.models.generateContent({
+        response = await withRetries(() => ai.models.generateContent({
             model,
             contents,
             config,
-        });
+        }));
 
         const responseText = response.text.trim();
         const cleanedText = responseText.replace(/^```json\s*/, '').replace(/```$/, '');
@@ -458,8 +488,8 @@ export const generateSceneImage = async (
     sceneVisual: string,
     interactionPrompt: string
 ): Promise<string> => {
-    const ai = getGoogleAIClient();
     try {
+        const ai = getGoogleAIClient();
         const interactionInstruction = (interactionPrompt && interactionPrompt.trim() !== '')
             ? `
             CRITICAL INSTRUCTION: You MUST follow this next instruction precisely to depict how the influencer interacts with the product. This is the most important part of the request.
@@ -502,7 +532,7 @@ export const generateSceneImage = async (
         }));
         const textPart = { text: prompt };
 
-        const response = await ai.models.generateContent({
+        const response = await withRetries(() => ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
             contents: {
                 parts: [influencerImagePart, ...productImageParts, textPart],
@@ -510,7 +540,7 @@ export const generateSceneImage = async (
             config: {
                 responseModalities: [Modality.IMAGE, Modality.TEXT],
             },
-        });
+        }));
 
         // The response can have multiple parts (image, text). We need to find the image part.
         for (const part of response.candidates[0].content.parts) {
@@ -536,9 +566,9 @@ export const startVideoGeneration = async (
     prompt: string,
     image: { data: string; mimeType: string }
 ): Promise<any> => {
-    const ai = getGoogleAIClient();
     try {
-        const operation = await ai.models.generateVideos({
+        const ai = getGoogleAIClient();
+        const operation = await withRetries(() => ai.models.generateVideos({
             model: 'veo-2.0-generate-001',
             prompt: prompt,
             image: {
@@ -548,7 +578,7 @@ export const startVideoGeneration = async (
             config: {
                 numberOfVideos: 1,
             }
-        });
+        }));
         return operation;
     } catch (error) {
         console.error("Error starting video generation:", error);
@@ -560,9 +590,9 @@ export const startVideoGeneration = async (
 };
 
 export const checkVideoStatus = async (operation: any): Promise<any> => {
-    const ai = getGoogleAIClient();
     try {
-        const updatedOperation = await ai.operations.getVideosOperation({ operation: operation });
+        const ai = getGoogleAIClient();
+        const updatedOperation = await withRetries(() => ai.operations.getVideosOperation({ operation: operation }));
         return updatedOperation;
     } catch (error) {
         console.error("Error checking video status:", error);
@@ -574,8 +604,8 @@ export const checkVideoStatus = async (operation: any): Promise<any> => {
 };
 
 export const getVoiceDesignParameters = async (influencerDescription: string): Promise<VoiceDesignParameters> => {
-    const ai = getGoogleAIClient();
     try {
+        const ai = getGoogleAIClient();
         const prompt = `
             You are an expert voice director. Based on the following influencer description, your task is to define the parameters for an AI voice generation model.
 
@@ -591,13 +621,13 @@ export const getVoiceDesignParameters = async (influencerDescription: string): P
             Analyze the description carefully to infer the most suitable parameters. Your entire response must be only the raw JSON object.
         `;
         
-        const response = await ai.models.generateContent({
+        const response = await withRetries(() => ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
             },
-        });
+        }));
         
         const responseText = response.text.trim();
         const cleanedText = responseText.replace(/^```json\s*/, '').replace(/```$/, '');
