@@ -284,6 +284,7 @@ const App: React.FC = () => {
              </div>
           </div>
         </section>
+        
       </main>
       <footer className="text-center py-6 mt-8 text-gray-600 text-sm">
         <p>Powered by Google Gemini & ElevenLabs</p>

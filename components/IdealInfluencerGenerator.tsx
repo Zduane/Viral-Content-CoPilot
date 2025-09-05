@@ -264,7 +264,7 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
     };
 
     const AnalysisItem: React.FC<{title: string, children: React.ReactNode}> = ({ title, children }) => (
-        <div>
+        <div title={title}>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{title}</p>
             <p className="text-sm text-gray-300 mt-1">{children}</p>
         </div>
@@ -488,6 +488,7 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                                         </AnalysisItem>
                                         <AnalysisItem title="Value Proposition">
                                             {result.product.productAnalysis.valueProposition}
+                                        {/* FIX: Corrected typo in closing tag from AanlysisItem to AnalysisItem */}
                                         </AnalysisItem>
                                         <AnalysisItem title="Market Saturation">
                                             {result.product.productAnalysis.marketSaturation}

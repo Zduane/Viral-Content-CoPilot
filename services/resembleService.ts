@@ -11,39 +11,6 @@ export interface VoiceDesignParams {
     voiceDescription: string;
 }
 
-// FIX: Added missing ElevenLabsVoice type for the VoiceoverTester component.
-export interface ElevenLabsVoice {
-    voice_id: string;
-    name: string;
-}
-
-// FIX: Added missing fetchElevenLabsVoices function for the VoiceoverTester component.
-// Fetches available voices from ElevenLabs
-export const fetchElevenLabsVoices = async (): Promise<ElevenLabsVoice[]> => {
-    if (!ELEVENLABS_API_KEY) {
-        throw new Error("ELEVENLABS_API_KEY environment variable not set.");
-    }
-    try {
-        const response = await fetch(`${API_URL}/voices`, {
-            headers: {
-                'xi-api-key': ELEVENLABS_API_KEY,
-            }
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`Failed to fetch voices: ${response.statusText} - ${errorBody}`);
-        }
-
-        const data = await response.json();
-        return data.voices;
-
-    } catch (error) {
-        console.error("Error fetching ElevenLabs voices:", error);
-        throw error;
-    }
-};
-
 // Designs a new voice using ElevenLabs Voice Design
 export const designVoice = async (params: VoiceDesignParams, name: string): Promise<string> => {
     if (!ELEVENLABS_API_KEY) {
@@ -81,7 +48,6 @@ export const designVoice = async (params: VoiceDesignParams, name: string): Prom
         throw error;
     }
 };
-
 
 // Generates a voiceover clip and returns a blob URL for the audio
 export const generateVoiceoverAudioUrl = async (text: string, voiceId: string): Promise<string> => {
