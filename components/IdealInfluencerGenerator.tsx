@@ -1,10 +1,10 @@
 
-
 import React, { useState, useCallback } from 'react';
 import { SparklesIcon, UploadIcon } from '../constants';
 import { GeneratedInfluencer, GeneratedProduct, VoiceDesignParameters } from '../types';
 import { generateIdealInfluencer, generateImage, getVoiceDesignParameters } from '../services/geminiService';
 import { designVoice } from '../services/resembleService';
+import { apiConfig } from '../services/apiConfig';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 
@@ -36,7 +36,7 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
     const [isVoicePanelOpen, setIsVoicePanelOpen] = useState<boolean>(false);
     const [voiceParams, setVoiceParams] = useState<VoiceDesignParameters | null>(null);
     const [voiceCreationSuccess, setVoiceCreationSuccess] = useState<boolean>(false);
-    const isElevenLabsConfigured = !!process.env.ELEVENLABS_API_KEY;
+    const isElevenLabsConfigured = !!apiConfig.elevenLabs;
 
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -460,7 +460,7 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                                                 </button>
                                                 {!isElevenLabsConfigured && (
                                                     <p className="text-xs text-yellow-400 mt-2 text-center">
-                                                        Voice design feature unavailable.
+                                                        Voice design unavailable. Add key to enable.
                                                     </p>
                                                 )}
                                             </div>

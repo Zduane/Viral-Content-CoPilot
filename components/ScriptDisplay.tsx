@@ -1,10 +1,10 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ScriptResult, GeneratedInfluencer } from '../types';
 import { ScriptIcon, CopyIcon, SparklesIcon, VideoCameraIcon, PlayCircleIcon } from '../constants';
 import { generateSceneImage } from '../services/geminiService';
 import { generateVoiceoverAudioUrl } from '../services/resembleService';
+import { apiConfig } from '../services/apiConfig';
 
 
 interface ScriptDisplayProps {
@@ -22,7 +22,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
     const [genError, setGenError] = useState<string | null>(null);
     const audioPlayerRef = useRef<HTMLAudioElement>(null);
     const isGeneratingAudioRef = useRef<Record<number, boolean>>({});
-    const isElevenLabsConfigured = !!process.env.ELEVENLABS_API_KEY;
+    const isElevenLabsConfigured = !!apiConfig.elevenLabs;
 
     const handleInteractionPromptChange = (sceneIndex: number, prompt: string) => {
         setScript(currentScript => {
@@ -72,7 +72,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
         setGenError(null);
 
         if (!isElevenLabsConfigured) {
-            setGenError("Voiceover generation is unavailable.");
+            setGenError("Voiceover generation is unavailable because the ElevenLabs API key is not configured.");
             return;
         }
     
@@ -141,7 +141,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
         // Generate audio if it doesn't exist
         if (!audioUrl) {
             if (!isElevenLabsConfigured) {
-                setGenError("Voiceover generation is unavailable.");
+                setGenError("Voiceover generation is unavailable because the ElevenLabs API key is not configured.");
                 videoElement.pause();
                 return;
             }

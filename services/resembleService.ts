@@ -1,5 +1,6 @@
+
 // Note: This service is for ElevenLabs. The filename is retained due to system constraints.
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+import { apiConfig } from './apiConfig';
 const API_URL = 'https://api.elevenlabs.io/v1';
 
 export interface VoiceDesignParams {
@@ -13,8 +14,9 @@ export interface VoiceDesignParams {
 
 // Designs a new voice using ElevenLabs Voice Design
 export const designVoice = async (params: VoiceDesignParams, name: string): Promise<string> => {
+    const ELEVENLABS_API_KEY = apiConfig.elevenLabs;
     if (!ELEVENLABS_API_KEY) {
-        throw new Error("ELEVENLABS_API_KEY environment variable not set.");
+        throw new Error("ElevenLabs API Key is not set. Voice features are disabled.");
     }
     try {
         const response = await fetch(`${API_URL}/voices/design`, {
@@ -51,8 +53,9 @@ export const designVoice = async (params: VoiceDesignParams, name: string): Prom
 
 // Generates a voiceover clip and returns a blob URL for the audio
 export const generateVoiceoverAudioUrl = async (text: string, voiceId: string): Promise<string> => {
+    const ELEVENLABS_API_KEY = apiConfig.elevenLabs;
     if (!ELEVENLABS_API_KEY) {
-        throw new Error("ELEVENLABS_API_KEY environment variable not set.");
+        throw new Error("ElevenLabs API Key is not set. Voice features are disabled.");
     }
     try {
         const response = await fetch(`${API_URL}/text-to-speech/${voiceId}`, {
