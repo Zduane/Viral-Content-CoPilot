@@ -1,20 +1,8 @@
 
 // A simple in-memory store for API keys provided at runtime.
 export const apiConfig = {
+  // FIX: Google API key is no longer managed here. geminiService will use process.env.API_KEY directly.
   google: null as string | null,
-  elevenLabs: null as string | null,
+  // FIX: ElevenLabs key is now sourced from environment variables.
+  elevenLabs: process.env.ELEVENLABS_API_KEY || null,
 };
-
-/**
- * Sets the API keys for the services to use.
- * This allows keys to be provided from environment variables or a user interface.
- * @param keys An object containing the API keys.
- */
-export function setApiKeys(keys: { google?: string | null; elevenLabs?: string | null }) {
-  if (keys.google) {
-    apiConfig.google = keys.google;
-  }
-  if (keys.elevenLabs) {
-    apiConfig.elevenLabs = keys.elevenLabs;
-  }
-}

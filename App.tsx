@@ -3,7 +3,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { INDUSTRIES, SparklesIcon, UserCircleIcon, ScriptIcon } from './constants';
 import { AnalysisResult, ScriptResult, GeneratedInfluencer, GeneratedProduct } from './types';
 import { fetchViralAnalysis, generateViralScript, generateImage } from './services/geminiService';
-import { setApiKeys } from './services/apiConfig';
 import IndustrySelector from './components/IndustrySelector';
 import AnalysisDisplay from './components/AnalysisDisplay';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -12,28 +11,9 @@ import IdealInfluencerGenerator from './components/IdealInfluencerGenerator';
 import ScriptGenerator from './components/ScriptGenerator';
 import ScriptDisplay from './components/ScriptDisplay';
 import RenderQueue from './components/RenderQueue';
-import ApiKeyModal from './components/ApiKeyModal';
 
 
 const App: React.FC = () => {
-  const [isConfigured, setIsConfigured] = useState(false);
-
-  useEffect(() => {
-    // Check for keys in the environment first.
-    const googleKey = process.env.API_KEY;
-    const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-
-    if (googleKey) {
-      setApiKeys({ google: googleKey, elevenLabs: elevenLabsKey });
-      setIsConfigured(true);
-    }
-  }, []); // Run only once on initial render
-
-  const handleConfigure = (keys: { google: string; elevenLabs: string }) => {
-    setApiKeys({ google: keys.google, elevenLabs: keys.elevenLabs });
-    setIsConfigured(true);
-  };
-  
   // State for Trend Analyzer (Step 1)
   const [selectedIndustry, setSelectedIndustry] = useState<string>(INDUSTRIES[0]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -202,10 +182,6 @@ const App: React.FC = () => {
         </div>
     </div>
   );
-
-  if (!isConfigured) {
-    return <ApiKeyModal onConfigure={handleConfigure} />;
-  }
 
   return (
     <div className="min-h-screen font-sans">

@@ -1,17 +1,15 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, ScriptResult, ProductAnalysis, VoiceDesignParameters } from '../types';
-import { apiConfig } from './apiConfig';
 
 /**
  * Lazily creates and returns a GoogleGenAI client instance.
  * Throws an error if the Google AI API key has not been configured.
  */
 function getGoogleAIClient(): GoogleGenAI {
-    if (!apiConfig.google) {
-        throw new Error("Google AI API Key not configured. Please set it in the environment or the startup modal.");
-    }
-    return new GoogleGenAI({ apiKey: apiConfig.google });
+    // FIX: Per @google/genai guidelines, the API key must be read directly from process.env.API_KEY.
+    // The application must assume this environment variable is pre-configured.
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 }
 
 const scriptSchema = {

@@ -1,4 +1,3 @@
-
 // Note: This service is for ElevenLabs. The filename is retained due to system constraints.
 import { apiConfig } from './apiConfig';
 const API_URL = 'https://api.elevenlabs.io/v1';
@@ -19,21 +18,20 @@ export const designVoice = async (params: VoiceDesignParams, name: string): Prom
         throw new Error("ElevenLabs API Key is not set. Voice features are disabled.");
     }
     try {
-        const response = await fetch(`${API_URL}/voices/design`, {
+        const response = await fetch(`${API_URL}/voice-generation/generate-voice`, {
             method: 'POST',
             headers: {
                 'xi-api-key': ELEVENLABS_API_KEY,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                name: name,
+                voice_name: name,
                 text: params.text,
                 voice_description: params.voiceDescription,
                 gender: params.gender,
                 age: params.age,
                 accent: params.accent,
                 accent_strength: params.accent_strength,
-                labels: {}
             })
         });
 
@@ -43,7 +41,7 @@ export const designVoice = async (params: VoiceDesignParams, name: string): Prom
         }
 
         const data = await response.json();
-        return data.voice_id;
+        return data.generated_voice_id;
 
     } catch (error) {
         console.error("Error designing ElevenLabs voice:", error);

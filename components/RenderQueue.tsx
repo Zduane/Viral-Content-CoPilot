@@ -52,7 +52,8 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
 
         for (const item of itemsToProcess) {
             const sceneIndex = item.originalIndex;
-            let pollingInterval: NodeJS.Timeout | null = null;
+            // FIX: Replaced NodeJS.Timeout with ReturnType<typeof setInterval> for browser compatibility.
+            let pollingInterval: ReturnType<typeof setInterval> | null = null;
             
             try {
                 // 0. Check if scene image exists (workflow requirement)
