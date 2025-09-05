@@ -48,7 +48,8 @@ export interface AnalysisResult {
 
 export interface Scene {
   visual: string;
-  voiceover: string;
+  script: string;
+  scriptType: 'voiceover' | 'dialogue';
   imageUrl?: string;
   isGeneratingImage?: boolean;
   interactionPrompt?: string;
@@ -93,6 +94,7 @@ export interface GeneratedInfluencer {
 export interface ProductAnalysis {
   salesPotential: string;
   problemSolved: string;
+
   valueProposition: string;
   marketSaturation: string;
 }

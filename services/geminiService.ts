@@ -1,15 +1,24 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnalysisResult, ScriptResult, ProductAnalysis, VoiceDesignParameters } from '../types';
+
+// Safely gets environment variables in a client-side context.
+const getEnv = (key: string): string | null => {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+        return (import.meta as any).env[key] || null;
+    }
+    return null;
+};
 
 /**
  * Lazily creates and returns a GoogleGenAI client instance.
  * Throws an error if the Google AI API key has not been configured.
  */
 function getGoogleAIClient(): GoogleGenAI {
-    // FIX: Per @google/genai guidelines, the API key must be read directly from process.env.API_KEY.
-    // The application must assume this environment variable is pre-configured.
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getEnv('VITE_API_KEY');
+    if (!apiKey) {
+        throw new Error("Google AI API Key not found. Please make sure the VITE_API_KEY environment variable is set.");
+    }
+    return new GoogleGenAI({ apiKey });
 }
 
 const scriptSchema = {
@@ -43,9 +52,16 @@ const scriptSchema = {
                         type: Type.STRING, 
                         description: "Description of the visual action in the scene. Act as a film director: specify the camera shot (e.g., 'dynamic close-up', 'wide tracking shot'), lighting, and overall mood to guide video generation." 
                     },
-                    voiceover: { type: Type.STRING, description: "The voiceover script for this scene." }
+                    scriptType: {
+                        type: Type.STRING,
+                        description: "The type of audio for this scene. MUST be either the exact string 'voiceover' (for an unseen narrator) or 'dialogue' (for words spoken by the on-screen influencer)."
+                    },
+                    script: { 
+                        type: Type.STRING, 
+                        description: "The script for this scene, which will be either a voiceover or dialogue based on the 'scriptType'." 
+                    }
                 },
-                required: ["visual", "voiceover"]
+                required: ["visual", "scriptType", "script"]
             },
             description: "An array of 2-4 scenes that tell a story or demonstrate the product."
         },
@@ -305,7 +321,7 @@ export const generateViralScript = async (
 
             **SCRIPT REQUIREMENTS:**
             1.  **Hook (First 3 seconds):** Create a powerful scroll-stopping hook with verbal, visual, and text overlay components.
-            2.  **Scenes (2-4 scenes):** Write 2 to 4 short scenes. For each scene's 'visual' description, you MUST be highly descriptive and use cinematic language. This is critical as it will be used to generate a video. Your description MUST include:
+            2.  **Scenes (2-4 scenes):** Write 2 to 4 short scenes. For each scene, you MUST decide whether to use a 'voiceover' (an unseen narrator) or 'dialogue' (words spoken directly by the influencer on screen) by setting the 'scriptType' field. Base this decision on what will have the highest conversion potential and be most engaging for the product and influencer. For each scene's 'visual' description, you MUST be highly descriptive and use cinematic language. This is critical as it will be used to generate a video. Your description MUST include:
                 - **Shot Type:** e.g., 'Dynamic close-up', 'extreme close-up', 'medium shot', 'wide establishing shot'.
                 - **Camera Movement:** e.g., 'fast whip pan', 'slow push-in', 'tracking shot', 'handheld shaky-cam effect', 'smooth dolly shot'.
                 - **Lighting:** e.g., 'dramatic side lighting', 'soft golden hour light', 'bright, clean studio lighting', 'neon-drenched'.

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo } from 'react';
 import { ScriptResult, Scene } from '../types';
 import { checkVideoStatus, startVideoGeneration } from '../services/geminiService';
@@ -11,6 +12,14 @@ interface RenderQueueProps {
   productImages: { data: string; mimeType: string }[];
   productDescription: string;
 }
+
+// Safely gets environment variables in a client-side context.
+const getEnv = (key: string): string | null => {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+        return (import.meta as any).env[key] || null;
+    }
+    return null;
+};
 
 const LOADING_MESSAGES = [
     "Conceptualizing your scene...",
@@ -75,12 +84,35 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
                 const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
                 const sceneImage = { data: base64Data, mimeType };
                 
+                const { script: scriptText, scriptType } = item;
+
+                let audioInstruction;
+                if (scriptType === 'dialogue' && scriptText && scriptText.trim() !== '') {
+                    audioInstruction = `The person in the image MUST animate their mouth to lip-sync the following dialogue as if they are speaking it directly to the camera. The mouth movements must be natural and synchronized to these exact words: "${scriptText}".`;
+                } else if (scriptType === 'voiceover' && scriptText && scriptText.trim() !== '') {
+                    // This is a voiceover. The person on screen is silent.
+                    audioInstruction = `The person in the image is NOT speaking. Their mouth should remain neutral or show emotion that matches the scene's mood, but they MUST NOT lip-sync or appear to be talking.`;
+                } else {
+                    // No script.
+                    audioInstruction = `The person in the image is NOT speaking. Their mouth should remain neutral.`;
+                }
+
+
                 const prompt = `
-                    Create a short, photorealistic, cinematic, UGC-style video based on the provided image.
-                    The scene is: "${item.visual}". This description contains specific camera shots, movements, and lighting instructions that you MUST follow precisely.
-                    The product in the scene is: "${productDescription}".
-                    Animate the still image to bring this scene to life, ensuring the movement is engaging and suitable for a social media ad.
-                    The final output should be 8K, highly detailed, with professional color grading, while perfectly preserving the appearance of the person and product from the source image.
+                    You are a master cinematographer. Create a short, photorealistic, cinematic, UGC-style video based on the provided image.
+                    
+                    **SCENE DIRECTIVES:**
+                    - **Visuals:** You MUST follow these visual instructions precisely: "${item.visual}". This includes specific camera shots, movements, and lighting.
+                    - **Emotion and Mood:** The influencer's facial expressions and body language MUST convey the emotion and mood implied by the visual description ("${item.visual}") and the script ("${scriptText}"). For example, if the script is excited, the influencer must look excited. If the visual description mentions "dramatic lighting", the mood must be dramatic.
+                    - **Dialogue/Action:** ${audioInstruction}
+
+                    **CONTEXT:**
+                    - **Product:** The product in the scene is: "${productDescription}".
+                    
+                    **FINAL OUTPUT REQUIREMENTS:**
+                    - Animate the still image to bring this scene to life, making it engaging for a social media ad.
+                    - The final output must be 8K, highly detailed, with professional color grading.
+                    - CRITICAL: You must perfectly preserve the appearance of the person and product from the source image. Do not change their identity or features.
                 `;
 
                 const operation = await startVideoGeneration(prompt, sceneImage);
@@ -106,9 +138,11 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
 
                                 const downloadLink = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
                                 if (downloadLink) {
-                                    // FIX: Fetch the video, create a blob URL, and use that for the video player.
-                                    // Directly using the download link with an API key as a src does not work reliably.
-                                    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                                    const apiKey = getEnv('VITE_API_KEY');
+                                    if (!apiKey) {
+                                        throw new Error("Google AI API Key not found. Cannot download generated video.");
+                                    }
+                                    const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
                                     if (!videoResponse.ok) {
                                         throw new Error(`Failed to download the generated video. Status: ${videoResponse.statusText}`);
                                     }

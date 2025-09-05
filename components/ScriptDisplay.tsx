@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ScriptResult, GeneratedInfluencer } from '../types';
 import { ScriptIcon, CopyIcon, SparklesIcon, VideoCameraIcon, PlayCircleIcon } from '../constants';
@@ -98,7 +99,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
                 return { ...currentScript, scenes: newScenes };
             });
     
-            const audioUrl = await generateVoiceoverAudioUrl(scene.voiceover, voiceId);
+            const audioUrl = await generateVoiceoverAudioUrl(scene.script, voiceId);
     
             setScript(currentScript => {
                 if (!currentScript) return null;
@@ -165,7 +166,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
             });
 
             try {
-                const newAudioUrl = await generateVoiceoverAudioUrl(scene.voiceover, voiceId);
+                const newAudioUrl = await generateVoiceoverAudioUrl(scene.script, voiceId);
                 
                 audio.src = newAudioUrl;
                 audio.currentTime = videoElement.currentTime;
@@ -221,7 +222,8 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
         script.scenes.forEach((scene, index) => {
             text += `SCENE ${index + 1}:\n`;
             text += `👁️ Visual: ${scene.visual}\n`;
-            text += `🎤 Voiceover: ${scene.voiceover}\n\n`;
+            const scriptTypeLabel = scene.scriptType === 'dialogue' ? 'Dialogue' : 'Voiceover';
+            text += `🎤 ${scriptTypeLabel}: ${scene.script}\n\n`;
         });
         
         text += `--- PRIMARY (TIKTOK) ---\n`;
@@ -371,7 +373,9 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
                              <div key={index} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/60 flex flex-col">
                                 <p className="font-semibold text-gray-300 mb-2">Scene {index + 1}</p>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-sm text-gray-400 flex-1"><span className="font-medium text-gray-300">🎤 Voiceover:</span> {scene.voiceover}</p>
+                                    <p className="text-sm text-gray-400 flex-1">
+                                      <span className="font-medium text-gray-300">🎤 {scene.scriptType === 'dialogue' ? 'Dialogue' : 'Voiceover'}:</span> {scene.script}
+                                    </p>
                                     <button onClick={() => handlePlayOrGenerateVoiceover(index)} className="ml-2 text-gray-400 hover:text-white transition-colors" title="Play Voiceover" disabled={scene.isGeneratingVoiceover}>
                                         {scene.isGeneratingVoiceover ? (
                                             <svg className="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
