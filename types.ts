@@ -1,5 +1,9 @@
-import { User } from 'firebase/auth';
-export type { User };
+// FIX: The firebase v9 modular imports were failing. Switched to firebase v8 compatible imports.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+
+// The User type is now available on the firebase namespace
+export type User = firebase.User;
 
 export type SubscriptionTier = 'free' | 'pro' | 'business';
 

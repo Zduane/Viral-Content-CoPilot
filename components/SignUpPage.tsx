@@ -96,13 +96,12 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
     setError(null);
     setIsLoading(true);
     try {
-      const userCredential = await signInWithGoogle();
-       if (userCredential.user) {
-        await createUserProfileDocument(userCredential.user);
-      }
+      // This will now trigger a page redirect. Profile creation is handled
+      // by the onAuthStateChanged listener in App.tsx after the redirect.
+      await signInWithGoogle();
     } catch (err) {
+      // This catch block will only execute if signInWithRedirect itself throws an error before redirecting.
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-    } finally {
       setIsLoading(false);
     }
   };

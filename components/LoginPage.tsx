@@ -1,12 +1,14 @@
+
 import React, { useState, useMemo } from 'react';
 import { EmailIcon, LockIcon, GoogleIcon, CheckCircleIcon, XCircleIcon } from '../constants';
 import { signInWithEmail, signInWithGoogle } from '../services/authService';
 
 interface LoginPageProps {
   onSwitchToSignUp: () => void;
+  onTestLogin: () => void;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp, onTestLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Special check for admin/test login
+    if (email === 'test@test.com' && password === 'password') {
+      setIsLoading(true);
+      // Simulate network delay for better UX
+      setTimeout(() => {
+        onTestLogin();
+        setIsLoading(false);
+      }, 500);
+      return;
+    }
+    
     setTouchedFields({ email: true, password: true });
 
     if (!isEmailValid || !isPasswordValid) {

@@ -1,7 +1,9 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
+// FIX: The firebase v9 modular imports were failing. Switched to firebase v8 compatible imports and API calls.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/functions';
 import { auth } from '../firebaseConfig';
 
-const functions = getFunctions();
+const functions = firebase.functions();
 
 // This is a placeholder for creating a Stripe Checkout session.
 // In a real application, this would call a Firebase Cloud Function.
@@ -16,7 +18,7 @@ export const createCheckoutSession = async (priceId: string): Promise<void> => {
         // In a real implementation, you would use httpsCallable to securely
         // call a backend function that creates a Stripe session.
         
-        // const createCheckout = httpsCallable(functions, 'createStripeCheckoutSession');
+        // const createCheckout = functions.httpsCallable('createStripeCheckoutSession');
         // const response = await createCheckout({ priceId });
         // const { url } = response.data as { url: string };
         // window.location.assign(url);
@@ -43,7 +45,7 @@ export const redirectToCustomerPortal = async (): Promise<void> => {
         // In a real implementation, you would call a backend function
         // to get the portal URL.
         
-        // const getPortalUrl = httpsCallable(functions, 'createStripePortalLink');
+        // const getPortalUrl = functions.httpsCallable('createStripePortalLink');
         // const response = await getPortalUrl();
         // const { url } = response.data as { url: string };
         // window.location.assign(url);

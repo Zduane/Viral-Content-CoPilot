@@ -503,6 +503,7 @@ export const generateSceneImage = async (
             1. Place the influencer from the base image into the described scene.
             2. Incorporate the *exact* product from the provided product image(s) into the scene.
             ${interactionInstruction}
+            3. If the product is an item of clothing, the influencer MUST be shown wearing the clothes in the generated image.
 
             **FINAL IMAGE REQUIREMENTS:**
             - The final image must be photorealistic.

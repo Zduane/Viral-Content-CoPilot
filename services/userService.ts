@@ -1,23 +1,17 @@
-import {
-  doc,
-  setDoc,
-  getDoc,
-  serverTimestamp,
-  updateDoc,
-  increment,
-  type DocumentData,
-} from 'firebase/firestore';
+// FIX: The firebase v9 modular imports were failing. Switched to firebase v8 compatible imports and API calls.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import { db } from '../firebaseConfig';
-import type { User } from 'firebase/auth';
-import type { UserProfile } from '../types';
+import type { User, UserProfile } from '../types';
+
 
 export const createUserProfileDocument = async (userAuth: User, additionalData: { fullName?: string } = {}) => {
   if (!userAuth) return;
 
-  const userDocRef = doc(db, 'users', userAuth.uid);
-  const snapshot = await getDoc(userDocRef);
+  const userDocRef = db.collection('users').doc(userAuth.uid);
+  const snapshot = await userDocRef.get();
 
-  if (!snapshot.exists()) {
+  if (!snapshot.exists) {
     const { displayName, email } = userAuth;
     
     // Default data for a new user profile, including subscription info
@@ -36,9 +30,9 @@ export const createUserProfileDocument = async (userAuth: User, additionalData: 
     };
 
     try {
-      await setDoc(userDocRef, {
+      await userDocRef.set({
         ...newUserProfile,
-        createdAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
       console.error('Error creating user document:', error);
@@ -51,11 +45,11 @@ export const createUserProfileDocument = async (userAuth: User, additionalData: 
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     if (!uid) return null;
-    const userDocRef = doc(db, 'users', uid);
-    const snapshot = await getDoc(userDocRef);
+    const userDocRef = db.collection('users').doc(uid);
+    const snapshot = await userDocRef.get();
 
-    if (snapshot.exists()) {
-        const data = snapshot.data();
+    if (snapshot.exists) {
+        const data = snapshot.data()!;
         // Return the full profile, including subscription and usage data
         return {
             fullName: data.fullName,
@@ -80,11 +74,11 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 
 export const updateUserUsage = async (uid: string, feature: keyof UserProfile['usage']): Promise<UserProfile['usage']> => {
     if (!uid) throw new Error("User ID is required to update usage.");
-    const userDocRef = doc(db, 'users', uid);
+    const userDocRef = db.collection('users').doc(uid);
     
     try {
-        await updateDoc(userDocRef, {
-            [`usage.${feature}`]: increment(1)
+        await userDocRef.update({
+            [`usage.${feature}`]: firebase.firestore.FieldValue.increment(1)
         });
 
         const updatedProfile = await getUserProfile(uid);

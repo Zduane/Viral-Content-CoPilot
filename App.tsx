@@ -1,9 +1,10 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { INDUSTRIES, SparklesIcon, UserCircleIcon, ScriptIcon, CrownIcon } from './constants';
 import { AnalysisResult, ScriptResult, GeneratedInfluencer, GeneratedProduct, User, UserProfile } from './types';
 import { fetchViralAnalysis, generateViralScript, generateImage } from './services/geminiService';
 import { onAuthStateChangedListener, signOutUser } from './services/authService';
-import { getUserProfile, updateUserUsage } from './services/userService';
+import { createUserProfileDocument, getUserProfile, updateUserUsage } from './services/userService';
 import IndustrySelector from './components/IndustrySelector';
 import AnalysisDisplay from './components/AnalysisDisplay';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -50,10 +51,12 @@ const App: React.FC = () => {
       setCurrentUser(user);
       if (user) {
         try {
+          // This ensures a profile exists for any signed-in user, crucial for the redirect flow.
+          await createUserProfileDocument(user);
           const profile = await getUserProfile(user.uid);
           setUserProfile(profile);
         } catch (error) {
-          console.error("Failed to fetch user profile:", error);
+          console.error("Failed to fetch or create user profile:", error);
           // Handle case where profile fetch fails, maybe sign out user
           await signOutUser();
         }
@@ -66,7 +69,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleUsageUpdate = useCallback(async (feature: keyof UserProfile['usage']) => {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.uid === 'test-admin-user') return; // Do not update usage for test user
     try {
         const newUsage = await updateUserUsage(currentUser.uid, feature);
         setUserProfile(prev => prev ? { ...prev, usage: newUsage } : null);
@@ -273,6 +276,35 @@ const App: React.FC = () => {
     setGeneratedProduct(null);
     setScriptResult(null);
   };
+
+  const handleTestLogin = useCallback(() => {
+    const testUser = {
+      uid: 'test-admin-user',
+      email: 'test@test.com',
+      displayName: 'Test Admin',
+      // Casting a plain object to the complex firebase.User type.
+      // This is safe as long as we only access properties we've defined (uid, email, displayName)
+      // and avoid calling any of its methods.
+    } as User;
+
+    const testUserProfile: UserProfile = {
+      fullName: 'Test Admin',
+      email: 'test@test.com',
+      createdAt: new Date(),
+      subscriptionTier: 'business', // Grant top-tier access for testing
+      subscriptionStatus: 'active',
+      usage: { // Effectively unlimited usage
+        analyses: 9999,
+        scripts: 9999,
+        videos: 9999,
+        influencerGenerations: 9999,
+        voiceDesigns: 9999,
+      },
+    };
+
+    setCurrentUser(testUser);
+    setUserProfile(testUserProfile);
+  }, []);
   
   if (isAuthLoading) {
     return (
@@ -285,7 +317,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (!currentUser || !userProfile) {
       return authView === 'login' ? (
-        <LoginPage onSwitchToSignUp={() => setAuthView('signup')} />
+        <LoginPage onSwitchToSignUp={() => setAuthView('signup')} onTestLogin={handleTestLogin} />
       ) : (
         <SignUpPage onSwitchToLogin={() => setAuthView('login')} />
       );

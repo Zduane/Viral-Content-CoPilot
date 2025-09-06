@@ -437,7 +437,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ script, setScript, influe
                                         value={scene.interactionPrompt || ''}
                                         onChange={(e) => handleInteractionPromptChange(index, e.target.value)}
                                         className="w-full bg-gray-700/80 border border-gray-600 rounded-md py-1.5 px-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                        placeholder="e.g., holding the mug by its large black handle"
+                                        placeholder="e.g., wearing the jacket, holding the mug"
                                         disabled={scene.isGeneratingImage || !!scene.imageUrl}
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Guide the AI on exactly how the product is used.</p>
