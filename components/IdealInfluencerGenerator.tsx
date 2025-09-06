@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback } from 'react';
-import { SparklesIcon, UploadIcon } from '../constants';
-import { GeneratedInfluencer, GeneratedProduct, VoiceDesignParameters } from '../types';
+import { SparklesIcon, UploadIcon, CrownIcon } from '../constants';
+import { GeneratedInfluencer, GeneratedProduct, VoiceDesignParameters, UserProfile } from '../types';
 import { generateIdealInfluencer, generateImage, getVoiceDesignParameters } from '../services/geminiService';
 import { designVoice } from '../services/resembleService';
 import { apiConfig } from '../services/apiConfig';
@@ -11,6 +10,9 @@ import ErrorMessage from './ErrorMessage';
 interface IdealInfluencerGeneratorProps {
     onInfluencerGenerated: (influencer: GeneratedInfluencer) => void;
     onProductGenerated: (product: GeneratedProduct) => void;
+    userProfile: UserProfile | null;
+    onUpgradeClick: () => void;
+    onUsageUpdate: (feature: keyof UserProfile['usage']) => void;
 }
 
 interface GenerationResult {
@@ -19,7 +21,13 @@ interface GenerationResult {
 }
 
 
-const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onInfluencerGenerated, onProductGenerated }) => {
+const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ 
+    onInfluencerGenerated, 
+    onProductGenerated, 
+    userProfile, 
+    onUpgradeClick,
+    onUsageUpdate 
+}) => {
     const [activeTab, setActiveTab] = useState<'url' | 'image'>('url');
     const [productUrl, setProductUrl] = useState<string>('');
     
@@ -37,6 +45,15 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
     const [voiceParams, setVoiceParams] = useState<VoiceDesignParameters | null>(null);
     const [voiceCreationSuccess, setVoiceCreationSuccess] = useState<boolean>(false);
     const isElevenLabsConfigured = !!apiConfig.elevenLabs;
+
+    const limits = {
+        influencerGenerations: userProfile?.subscriptionTier === 'free' ? 3 : userProfile?.subscriptionTier === 'pro' ? 50 : Infinity,
+        voiceDesigns: userProfile?.subscriptionTier === 'free' ? 1 : userProfile?.subscriptionTier === 'pro' ? 10 : Infinity,
+    };
+    
+    const usage = userProfile?.usage;
+    const canGenerateInfluencer = usage ? usage.influencerGenerations < limits.influencerGenerations : false;
+    const canDesignVoice = usage ? usage.voiceDesigns < limits.voiceDesigns : false;
 
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,6 +109,17 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
         setError(null);
         setResult(null);
 
+        if (!userProfile) {
+            setError("User profile not loaded. Please try again.");
+            return;
+        }
+
+        if (!canGenerateInfluencer) {
+            setError(`You've reached your limit of ${limits.influencerGenerations} influencer generations. Please upgrade.`);
+            onUpgradeClick();
+            return;
+        }
+
         const input = activeTab === 'url' ? { url: productUrl } : { images: productImageFiles };
         if (activeTab === 'url' && !productUrl.trim()) {
             setError("Please enter a product URL.");
@@ -106,7 +134,6 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
         try {
             const genResult = await generateIdealInfluencer(input);
 
-            // Generate influencer image, and determine product image (either from URL or uploaded)
             const influencerImageUrl = await generateImage(genResult.imagePrompt);
             const productImageUrl = activeTab === 'url' ? genResult.productImageUrl! : productImagePreviews[0]!;
 
@@ -116,6 +143,8 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
             
             const influencerBase64 = influencerImageUrl.split(',')[1];
             const influencerMimeType = influencerImageUrl.substring(influencerImageUrl.indexOf(':') + 1, influencerImageUrl.indexOf(';'));
+            
+            await onUsageUpdate('influencerGenerations');
 
             setResult({
                 influencer: {
@@ -126,7 +155,6 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                 product: {
                     description: genResult.productDescription,
                     imageUrl: productImageUrl,
-                    // Pass the first uploaded image file to be used in the next step
                     imageFile: activeTab === 'image' ? productImageFiles[0]! : undefined,
                     productAnalysis: genResult.productAnalysis,
                 }
@@ -137,10 +165,15 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
         } finally {
             setIsLoading(false);
         }
-    }, [activeTab, productUrl, productImageFiles, productImagePreviews]);
+    }, [activeTab, productUrl, productImageFiles, productImagePreviews, userProfile, canGenerateInfluencer, limits.influencerGenerations, onUpgradeClick, onUsageUpdate]);
     
     const handleStartVoiceDesign = async () => {
         if (!result) return;
+        if (!canDesignVoice) {
+            setError(`You've reached your limit of ${limits.voiceDesigns} custom voice designs. Please upgrade.`);
+            onUpgradeClick();
+            return;
+        }
         setIsVoiceLoading(true);
         setError(null);
         try {
@@ -168,6 +201,8 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                 text: voiceParams.sampleText,
             }, `Influencer - ${new Date().toISOString()}`);
             
+            await onUsageUpdate('voiceDesigns');
+
             setResult(prev => {
                 if (!prev) return null;
                 const newInfluencer = { ...prev.influencer, voiceId: voiceId };
@@ -203,13 +238,11 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
     
         const { description, imageUrl, imageFile, productAnalysis } = result.product;
 
-        // If imageFile already exists (from image upload tab), use it directly
         if (imageFile) {
             onProductGenerated({ description, imageUrl, imageFile, productAnalysis });
             return;
         }
     
-        // If it's from a URL, try to fetch and convert it.
         try {
             const response = await fetch(imageUrl);
             if (!response.ok) throw new Error('Network response was not ok');
@@ -233,8 +266,6 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
     
         } catch (error) {
             console.warn("Could not fetch product image directly, likely due to CORS. Passing URL for preview.", error);
-            // Fallback: pass the URL for preview, but no file data.
-            // The ScriptGenerator will handle prompting the user to upload manually.
             onProductGenerated({ description, imageUrl, imageFile: undefined, productAnalysis });
         }
     }
@@ -264,7 +295,7 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
     };
 
     const AnalysisItem: React.FC<{title: string, children: React.ReactNode}> = ({ title, children }) => (
-        <div title={title}>
+        <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{title}</p>
             <p className="text-sm text-gray-300 mt-1">{children}</p>
         </div>
@@ -338,7 +369,7 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
             <div className="mt-6 text-center">
                 <button
                     onClick={handleGenerate}
-                    disabled={isLoading}
+                    disabled={isLoading || !canGenerateInfluencer}
                     className="inline-flex w-full sm:w-auto items-center justify-center px-8 py-3 bg-indigo-600 rounded-lg font-semibold text-white hover:bg-indigo-500 transition-all duration-300 disabled:bg-indigo-800 disabled:cursor-not-allowed transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
                 >
                     {isLoading ? (
@@ -356,6 +387,12 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                         </>
                     )}
                 </button>
+                 {!canGenerateInfluencer && userProfile && (
+                    <div className="mt-3 text-xs text-yellow-400 flex items-center justify-center gap-2">
+                        <CrownIcon className="w-4 h-4" />
+                        <span>You've reached your generation limit. <button onClick={onUpgradeClick} className="font-bold underline hover:text-yellow-300">Upgrade</button> to continue.</span>
+                    </div>
+                )}
             </div>
             
             <div className="mt-8">
@@ -445,10 +482,10 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                                         result.influencer.voiceId ? (
                                             <p className="text-green-400 text-sm font-semibold py-2">✓ Custom Voice Ready</p>
                                         ) : (
-                                            <div>
+                                            <div className="relative group">
                                                 <button
                                                     onClick={handleStartVoiceDesign}
-                                                    disabled={isVoiceLoading || !isElevenLabsConfigured}
+                                                    disabled={isVoiceLoading || !isElevenLabsConfigured || !canDesignVoice}
                                                     className="inline-flex w-full items-center justify-center px-4 py-2 bg-pink-600 rounded-lg font-semibold text-sm text-white hover:bg-pink-500 transition-all duration-300 disabled:bg-pink-800 disabled:cursor-not-allowed"
                                                 >
                                                     {isVoiceLoading ? (
@@ -458,6 +495,12 @@ const IdealInfluencerGenerator: React.FC<IdealInfluencerGeneratorProps> = ({ onI
                                                         </>
                                                     ) : 'Design Custom Voice'}
                                                 </button>
+                                                {!canDesignVoice && isElevenLabsConfigured && userProfile && (
+                                                    <div className="mt-2 text-xs text-yellow-400 flex items-center justify-center gap-2">
+                                                        <CrownIcon className="w-4 h-4" />
+                                                        <span>Voice limit reached. <button onClick={onUpgradeClick} className="font-bold underline hover:text-yellow-300">Upgrade</button>.</span>
+                                                    </div>
+                                                )}
                                                 {!isElevenLabsConfigured && (
                                                     <p className="text-xs text-yellow-400 mt-2 text-center">
                                                         Voice design unavailable. Add key to enable.

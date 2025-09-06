@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AnalysisResult, ScriptResult, ProductAnalysis, VoiceDesignParameters } from '../types';
+import { AnalysisResult, ScriptResult, ProductAnalysis, VoiceDesignParameters, SubscriptionTier } from '../types';
 import { getEnv } from './apiConfig';
 
 /**
@@ -556,14 +556,28 @@ export const generateSceneImage = async (
 };
 
 export const startVideoGeneration = async (
-    prompt: string,
-    image: { data: string; mimeType: string }
+    basePrompt: string,
+    image: { data: string; mimeType: string },
+    tier: SubscriptionTier,
+    resolution: string,
+    frameRate: number
 ): Promise<any> => {
     try {
         const ai = getGoogleAIClient();
+
+        let finalPrompt = `${basePrompt}\n\n**TECHNICAL REQUIREMENTS:**\n`;
+        finalPrompt += `- Render the video at ${resolution} resolution.\n`;
+        finalPrompt += `- The frame rate must be ${frameRate} fps.\n`;
+
+        if (tier === 'free') {
+            finalPrompt += `- A small, subtle watermark with the text 'Made with Viral Co-pilot' must be placed in the bottom-right corner of the video.\n`;
+        } else {
+            finalPrompt += `- The video must be clean, with no watermarks.\n`;
+        }
+
         const operation = await withRetries(() => ai.models.generateVideos({
             model: 'veo-2.0-generate-001',
-            prompt: prompt,
+            prompt: finalPrompt,
             image: {
                 imageBytes: image.data,
                 mimeType: image.mimeType,
@@ -581,6 +595,7 @@ export const startVideoGeneration = async (
         throw new Error("An unknown error occurred while starting video generation.");
     }
 };
+
 
 export const checkVideoStatus = async (operation: any): Promise<any> => {
     try {

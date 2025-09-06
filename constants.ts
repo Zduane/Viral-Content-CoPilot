@@ -169,3 +169,9 @@ export const ArrowLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =>
     React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" })
   )
 );
+
+export const CrownIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: 1.5, stroke: "currentColor", ...props },
+    React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M16.5 18.75h-9a9 9 0 1 1 9 0Zm-9 0a9 9 0 0 0 9 0M12 2.25L15 6.75l6 1.5-4.5 3.75 1.5 6L12 15.75l-6 3 1.5-6L1.5 8.25l6-1.5L12 2.25Z" })
+  )
+);

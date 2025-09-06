@@ -1,11 +1,21 @@
 import { User } from 'firebase/auth';
 export type { User };
 
+export type SubscriptionTier = 'free' | 'pro' | 'business';
 
 export interface UserProfile {
   fullName: string;
   email: string;
   createdAt: Date;
+  subscriptionTier: SubscriptionTier;
+  subscriptionStatus: 'active' | 'canceled' | 'past_due' | 'incomplete';
+  usage: {
+    analyses: number;
+    scripts: number;
+    videos: number;
+    influencerGenerations: number;
+    voiceDesigns: number;
+  };
 }
 
 export interface Persona {

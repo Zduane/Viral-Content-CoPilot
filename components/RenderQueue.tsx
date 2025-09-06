@@ -1,9 +1,7 @@
-
-
 import React, { useState, useCallback, useMemo } from 'react';
-import { ScriptResult, Scene } from '../types';
+import { ScriptResult, Scene, UserProfile } from '../types';
 import { checkVideoStatus, startVideoGeneration } from '../services/geminiService';
-import { VideoCameraIcon } from '../constants';
+import { VideoCameraIcon, CrownIcon } from '../constants';
 import { getEnv } from '../services/apiConfig';
 
 interface RenderQueueProps {
@@ -12,6 +10,9 @@ interface RenderQueueProps {
   influencerImage: { data: string; mimeType: string };
   productImages: { data: string; mimeType: string }[];
   productDescription: string;
+  userProfile: UserProfile | null;
+  onUpgradeClick: () => void;
+  onUsageUpdate: () => void;
 }
 
 const LOADING_MESSAGES = [
@@ -26,9 +27,15 @@ const LOADING_MESSAGES = [
     "Almost there, preparing your video!"
 ];
 
-const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDescription }) => {
+const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDescription, userProfile, onUpgradeClick, onUsageUpdate }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingError, setProcessingError] = useState<string | null>(null);
+    const [resolution, setResolution] = useState('720p');
+    const [frameRate, setFrameRate] = useState(24);
+
+    const isPremiumTier = userProfile?.subscriptionTier === 'pro' || userProfile?.subscriptionTier === 'business';
+    const videoLimit = userProfile?.subscriptionTier === 'free' ? 2 : userProfile?.subscriptionTier === 'pro' ? 25 : Infinity;
+    const videosUsed = userProfile?.usage.videos ?? 0;
 
     const queuedItems = useMemo(() => script.scenes
         .map((scene, index) => ({ ...scene, originalIndex: index }))
@@ -52,69 +59,51 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
             .map((scene, index) => ({ ...scene, originalIndex: index }))
             .filter(scene => scene.videoStatus === 'queued');
 
+        if (!userProfile || videosUsed + itemsToProcess.length > videoLimit) {
+            setProcessingError(`Rendering these ${itemsToProcess.length} videos would exceed your monthly limit of ${videoLimit}.`);
+            onUpgradeClick();
+            setIsProcessing(false);
+            return;
+        }
+
         for (const item of itemsToProcess) {
             const sceneIndex = item.originalIndex;
             let pollingInterval: ReturnType<typeof setInterval> | null = null;
             
             try {
-                // 0. Check if scene image exists (workflow requirement)
                 if (!item.imageUrl) {
-                    const errorMessage = `Scene ${sceneIndex + 1} is missing a generated image. Please generate the image first.`;
-                    setProcessingError(errorMessage);
-                    updateScene(sceneIndex, { videoStatus: 'error', videoGenerationMessage: errorMessage });
-                    break; // Stop processing the queue
+                    throw new Error(`Scene ${sceneIndex + 1} is missing a generated image. Please generate the image first.`);
                 }
 
-                // 1. Set status to processing and start message cycling
                 updateScene(sceneIndex, { videoStatus: 'processing', videoGenerationMessage: LOADING_MESSAGES[0] });
 
-                // 2. Prepare image data and the advanced prompt
                 const [header, base64Data] = item.imageUrl.split(',');
-                if (!header || !base64Data) {
-                    throw new Error("Invalid image data URL format for the scene image.");
-                }
+                if (!header || !base64Data) throw new Error("Invalid image data URL format.");
                 const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
                 const sceneImage = { data: base64Data, mimeType };
                 
                 const { script: scriptText, scriptType } = item;
+                let audioInstruction = scriptType === 'dialogue' && scriptText?.trim()
+                    ? `The person in the image MUST animate their mouth to lip-sync the following dialogue: "${scriptText}".`
+                    : `The person in the image is NOT speaking. Their mouth should remain neutral.`;
 
-                let audioInstruction;
-                if (scriptType === 'dialogue' && scriptText && scriptText.trim() !== '') {
-                    audioInstruction = `The person in the image MUST animate their mouth to lip-sync the following dialogue as if they are speaking it directly to the camera. The mouth movements must be natural and synchronized to these exact words: "${scriptText}".`;
-                } else if (scriptType === 'voiceover' && scriptText && scriptText.trim() !== '') {
-                    // This is a voiceover. The person on screen is silent.
-                    audioInstruction = `The person in the image is NOT speaking. Their mouth should remain neutral or show emotion that matches the scene's mood, but they MUST NOT lip-sync or appear to be talking.`;
-                } else {
-                    // No script.
-                    audioInstruction = `The person in the image is NOT speaking. Their mouth should remain neutral.`;
-                }
-
-
-                const prompt = `
-                    You are a master cinematographer. Create a short, photorealistic, cinematic, UGC-style video based on the provided image.
-                    
-                    **SCENE DIRECTIVES:**
-                    - **Visuals:** You MUST follow these visual instructions precisely: "${item.visual}". This includes specific camera shots, movements, and lighting.
-                    - **Emotion and Mood:** The influencer's facial expressions and body language MUST convey the emotion and mood implied by the visual description ("${item.visual}") and the script ("${scriptText}"). For example, if the script is excited, the influencer must look excited. If the visual description mentions "dramatic lighting", the mood must be dramatic.
+                const basePrompt = `
+                    Create a photorealistic, cinematic, UGC-style video based on the provided image.
+                    - **Visuals:** Follow these instructions precisely: "${item.visual}".
+                    - **Emotion:** The influencer's expression MUST match the mood of: "${item.visual}" and script: "${scriptText}".
                     - **Dialogue/Action:** ${audioInstruction}
-
-                    **CONTEXT:**
-                    - **Product:** The product in the scene is: "${productDescription}".
-                    
-                    **FINAL OUTPUT REQUIREMENTS:**
-                    - Animate the still image to bring this scene to life, making it engaging for a social media ad.
-                    - The final output must be 8K, highly detailed, with professional color grading.
-                    - CRITICAL: You must perfectly preserve the appearance of the person and product from the source image. Do not change their identity or features.
+                    - **Product Context:** The product is: "${productDescription}".
+                    - **Preserve Appearance:** CRITICAL: Perfectly preserve the appearance of the person and product. Do not change their identity.
                 `;
 
-                const operation = await startVideoGeneration(prompt, sceneImage);
+                const operation = await startVideoGeneration(basePrompt, sceneImage, userProfile.subscriptionTier, resolution, frameRate);
+                
+                onUsageUpdate();
 
-                // 3. Start polling for the result
                 await new Promise<void>((resolve, reject) => {
                     let messageIndex = 1;
                     pollingInterval = setInterval(async () => {
                         try {
-                            // Cycle through loading messages
                             updateScene(sceneIndex, { videoGenerationMessage: LOADING_MESSAGES[messageIndex % LOADING_MESSAGES.length] });
                             messageIndex++;
                             
@@ -122,30 +111,22 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
 
                             if (updatedOp.done) {
                                 if (pollingInterval) clearInterval(pollingInterval);
-                                
-                                if (updatedOp.error) {
-                                    const errorMessage = `Generation failed: ${updatedOp.error.message} (Code: ${updatedOp.error.code})`;
-                                    throw new Error(errorMessage);
-                                }
+                                if (updatedOp.error) throw new Error(`Generation failed: ${updatedOp.error.message}`);
 
                                 const downloadLink = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
-                                if (downloadLink) {
-                                    const apiKey = getEnv('VITE_API_KEY') || getEnv('API_KEY');
-                                    if (!apiKey) {
-                                        throw new Error("Google AI API Key not found. Please make sure VITE_API_KEY or API_KEY is set to download the video.");
-                                    }
-                                    const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
-                                    if (!videoResponse.ok) {
-                                        throw new Error(`Failed to download the generated video. Status: ${videoResponse.statusText}`);
-                                    }
-                                    const videoBlob = await videoResponse.blob();
-                                    const videoUrl = URL.createObjectURL(videoBlob);
-                                    
-                                    updateScene(sceneIndex, { videoStatus: 'done', videoUrl: videoUrl, videoGenerationMessage: undefined });
-                                    resolve();
-                                } else {
-                                    throw new Error("Video generation finished successfully, but the response did not contain a video link.");
-                                }
+                                if (!downloadLink) throw new Error("Generation finished, but no video link was returned.");
+                                
+                                const apiKey = getEnv('VITE_API_KEY') || getEnv('API_KEY');
+                                if (!apiKey) throw new Error("API Key not found, cannot download video.");
+                                
+                                const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
+                                if (!videoResponse.ok) throw new Error(`Failed to download video: ${videoResponse.statusText}`);
+                                
+                                const videoBlob = await videoResponse.blob();
+                                const videoUrl = URL.createObjectURL(videoBlob);
+                                
+                                updateScene(sceneIndex, { videoStatus: 'done', videoUrl: videoUrl, videoGenerationMessage: undefined });
+                                resolve();
                             }
                         } catch (pollError) {
                             if (pollingInterval) clearInterval(pollingInterval);
@@ -162,13 +143,37 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
             }
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
-
         setIsProcessing(false);
-    }, [script.scenes, updateScene, productDescription]);
+    }, [script.scenes, updateScene, productDescription, userProfile, videosUsed, videoLimit, onUpgradeClick, resolution, frameRate, onUsageUpdate]);
     
-    if (queuedItems.length === 0) {
-        return null; // Don't render anything if the queue is empty
-    }
+    if (queuedItems.length === 0) return null;
+
+    const renderOption = (value: string, label: string, premium: boolean) => (
+        <option key={value} value={value} disabled={premium && !isPremiumTier}>
+            {label}{premium && !isPremiumTier ? ' (Pro)' : ''}
+        </option>
+    );
+
+    const SelectInput: React.FC<{label: string, value: any, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void, children: React.ReactNode, premium: boolean}> = ({ label, value, onChange, children, premium }) => (
+        <div className="relative flex-1 group">
+            <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>
+            <select
+                value={value}
+                onChange={onChange}
+                className={`w-full appearance-none bg-gray-700 border border-gray-600 rounded-lg py-2 pl-3 pr-8 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 transition disabled:opacity-50`}
+            >
+                {children}
+            </select>
+            {premium && !isPremiumTier && (
+                <div className="absolute top-1/2 right-2 text-yellow-400" onClick={onUpgradeClick}>
+                    <CrownIcon className="w-5 h-5 cursor-pointer" />
+                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        Upgrade to Pro to unlock
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
     return (
         <div className="bg-gray-900/80 rounded-xl p-6 md:p-8 border border-gray-700/50 shadow-lg backdrop-blur-sm animate-fade-in">
@@ -190,6 +195,23 @@ const RenderQueue: React.FC<RenderQueueProps> = ({ script, setScript, productDes
                     </div>
                 ))}
             </div>
+
+            <div className="mt-6 pt-6 border-t border-gray-700/60">
+                <h4 className="text-base font-semibold text-gray-200 mb-3 text-center">Render Settings</h4>
+                <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+                    <SelectInput label="Resolution" value={resolution} onChange={e => setResolution(e.target.value)} premium={true}>
+                        {renderOption('720p', '720p HD', false)}
+                        {renderOption('1080p', '1080p Full HD', true)}
+                        {renderOption('4K', '4K Ultra HD', true)}
+                    </SelectInput>
+                    <SelectInput label="Frame Rate" value={frameRate} onChange={e => setFrameRate(Number(e.target.value))} premium={true}>
+                        {renderOption('24', '24 fps (Cinematic)', false)}
+                        {renderOption('30', '30 fps (Standard)', false)}
+                        {renderOption('60', '60 fps (Smooth)', true)}
+                    </SelectInput>
+                </div>
+            </div>
+
             <div className="mt-6 text-center">
                 {processingError && <p className="text-sm text-red-400 mb-4">{processingError}</p>}
                 <button
